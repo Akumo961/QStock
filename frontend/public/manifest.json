@@ -1,0 +1,124 @@
+{
+  "name": "QR Inventory Management System",
+  "short_name": "QR Inventory",
+  "description": "Scan and manage inventory items using QR codes. Borrow, return, and track equipment efficiently.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1b4332",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "fr-CA",
+  "dir": "ltr",
+
+  "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+
+  "categories": [
+    "productivity",
+    "business",
+    "utilities"
+  ],
+
+  "shortcuts": [
+    {
+      "name": "Scanner QR",
+      "short_name": "Scanner",
+      "description": "Scanner un code QR pour emprunter ou retourner",
+      "url": "/scanner",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Inventaire",
+      "short_name": "Inventaire",
+      "description": "Parcourir l'inventaire disponible",
+      "url": "/inventory",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Mon Profil",
+      "short_name": "Profil",
+      "description": "Voir votre profil et emprunts actifs",
+      "url": "/profile",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+
+  "screenshots": [],
+  "prefer_related_applications": false,
+  "related_applications": [],
+
+  "offline_enabled": true,
+
+  "serviceworker": {
+    "src": "/sw.js",
+    "scope": "/",
+    "update_via_cache": "none"
+  }
+}

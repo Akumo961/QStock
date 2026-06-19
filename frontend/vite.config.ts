@@ -1,0 +1,163 @@
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
+import path from 'path';
+import { pwaConfig } from './pwa-config.js';
+import basicSsl from '@vitejs/plugin-basic-ssl';
+
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    plugins: [
+      basicSsl(),
+
+      react({
+         fastRefresh: true,
+         babel: {
+           plugins: ['@emotion/babel-plugin'],
+        },
+      }),
+
+  VitePWA(pwaConfig),
+],
+
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@components': path.resolve(__dirname, './src/components'),
+        '@pages': path.resolve(__dirname, './src/pages'),
+        '@hooks': path.resolve(__dirname, './src/hooks'),
+        '@services': path.resolve(__dirname, './src/services'),
+        '@utils': path.resolve(__dirname, './src/utils'),
+        '@types': path.resolve(__dirname, './src/types'),
+        '@assets': path.resolve(__dirname, './src/assets'),
+      },
+    },
+
+    server: {
+      port: 5173,
+      host: true,
+      open: false,
+      cors: true,
+
+      https: true,
+
+      proxy: {
+        '/api': {
+          target: env.VITE_API_URL || 'http://192.168.2.31:8000',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
+
+      hmr: {
+        host: '192.168.2.31',
+        port: 5173,
+        protocol: 'ws',
+        overlay: true,
+      },
+    },
+
+    preview: {
+      port: 4173,
+      host: true,
+      open: true,
+    },
+
+    build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      sourcemap: mode === 'development',
+      minify: 'terser',
+
+      terserOptions: {
+        compress: {
+          drop_console: mode === 'production',
+          drop_debugger: mode === 'production',
+        },
+      },
+
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-core': ['react', 'react-dom'],
+            'react-router': ['react-router-dom'],
+            'mui-core': [
+              '@mui/material',
+              '@mui/system',
+              '@emotion/react',
+              '@emotion/styled',
+            ],
+            'mui-icons': ['@mui/icons-material'],
+            'date-utils': ['date-fns'],
+            'qr-libs': ['html5-qrcode', 'qrcode'],
+            'utils': ['notistack'],
+          },
+
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name?.split('.');
+            let extType = info?.[info.length - 1];
+
+            if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType ?? '')) {
+              extType = 'images';
+            } else if (/woff|woff2|eot|ttf|otf/i.test(extType ?? '')) {
+              extType = 'fonts';
+            }
+
+            return `assets/${extType}/[name]-[hash][extname]`;
+          },
+
+          chunkFileNames: 'assets/js/[name]-[hash].js',
+          entryFileNames: 'assets/js/[name]-[hash].js',
+        },
+      },
+
+      chunkSizeWarningLimit: 1000,
+      assetsInlineLimit: 4096,
+      cssCodeSplit: true,
+      reportCompressedSize: true,
+      manifest: true,
+    },
+
+    optimizeDeps: {
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        '@mui/material',
+        '@mui/icons-material',
+        'date-fns',
+        'notistack',
+      ],
+      exclude: ['@vite/client', '@vite/env'],
+    },
+
+    css: {
+      devSourcemap: mode === 'development',
+      modules: {
+        localsConvention: 'camelCase',
+      },
+      preprocessorOptions: {
+        scss: {
+          additionalData: `$injectedColor: orange;`,
+        },
+      },
+    },
+
+    define: {
+      __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || '1.0.0'),
+      __APP_NAME__: JSON.stringify(env.VITE_APP_NAME || 'QR Inventory System'),
+    },
+
+    esbuild: {
+      logOverride: { 'this-is-undefined-in-esm': 'silent' },
+      drop: mode === 'production' ? ['console', 'debugger'] : [],
+    },
+
+    json: {
+      stringify: true,
+    },
+  };
+});

@@ -1,0 +1,86 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+dist/
+*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads & Media
+uploads/
+media/
+static/files/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+
+# Docker
+.dockerignore
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Certificates
+*.pem
+*.key
+*.crt
+
+# Build outputs
+*.pyc
+*.pyo
+
+# Alembic
+alembic/versions/__pycache__/
+
+# Frontend
+frontend/build/
+frontend/dist/
+frontend/.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Secrets
+secrets/
+credentials/
+
+# Local configuration
+local_settings.py
+config.local.js

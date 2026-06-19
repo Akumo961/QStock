@@ -1,0 +1,76 @@
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from typing import Optional
+from datetime import datetime
+
+
+class UserBase(BaseModel):
+    """Base user schemas with common fields"""
+    email: EmailStr
+    full_name: str = Field(..., min_length=1, max_length=255)
+    department: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    employee_id: Optional[str] = Field(None, max_length=50)
+
+
+class UserCreate(UserBase):
+    """Schema for creating a new user"""
+    password: str = Field(..., min_length=6)
+    is_admin: bool = False
+
+
+class UserUpdate(BaseModel):
+    """Schema for updating a user"""
+    full_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    department: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    employee_id: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+    is_admin: Optional[bool] = None
+
+
+class UserChangePassword(BaseModel):
+    """Schema for changing user password"""
+    old_password: str
+    new_password: str = Field(..., min_length=6)
+
+
+class UserResponse(UserBase):
+    """Schema for user response"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    qr_code_data: str
+    qr_code_image: Optional[str] = None
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class UserQRCode(BaseModel):
+    """Schema for user QR code information"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    full_name: str
+    qr_code_data: str
+    qr_code_image: str
+
+
+class UserListResponse(BaseModel):
+    """Schema for paginated user list"""
+    users: list[UserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class UserStats(BaseModel):
+    """Schema for user statistics"""
+    total_borrows: int
+    active_borrows: int
+    total_returns: int
+    overdue_items: int
+    total_reviews: int
