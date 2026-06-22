@@ -25,7 +25,7 @@ interface RegisterData {
   password: string;
   full_name: string;
   department?: string;
-  phone?: string;
+  phone: string;
   employee_id?: string;
 }
 

@@ -68,17 +68,10 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = 'utf-8'
         case_sensitive = True
+        extra = "ignore"
 
 
-# Create settings instance
 settings = Settings()
-
-print("OLLAMA_URL =", settings.OLLAMA_URL)
-print("OLLAMA_MODEL =", settings.OLLAMA_MODEL)
-
-# Debug print (hide password for security)
-print(f"🔍 Database URL: {settings.DATABASE_URL}")
-print(f"👤 Admin email: {settings.INITIAL_ADMIN_EMAIL}")
 
 # Ensure upload directory exists
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

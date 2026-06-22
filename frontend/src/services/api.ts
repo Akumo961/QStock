@@ -154,17 +154,22 @@ export const authAPI = {
   login: (email: string, password: string) =>
     api.post<{ access_token: string; user: any }>('/auth/login', { email, password }),
 
-  register: (data: { email: string; password: string; full_name: string }) =>
+  register: (data: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone: string;
+    department?: string;
+    employee_id?: string;
+  }) =>
     api.post<{ access_token: string; user: any }>('/auth/register', data),
 
-  me: () =>
-    api.get<any>('/auth/me'),
+  me: () => api.get<any>('/auth/me'),
 
   refreshToken: () =>
     api.post<{ access_token: string; user: any }>('/auth/refresh'),
 
-  logout: () =>
-    api.post('/auth/logout'),
+  logout: () => api.post('/auth/logout'),
 };
 
 export const userAPI = {

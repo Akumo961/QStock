@@ -4,7 +4,6 @@ from datetime import datetime
 
 
 class UserBase(BaseModel):
-    """Base user schemas with common fields"""
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
     department: Optional[str] = Field(None, max_length=100)
@@ -13,13 +12,11 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Schema for creating a new user"""
     password: str = Field(..., min_length=6)
     is_admin: bool = False
 
 
 class UserUpdate(BaseModel):
-    """Schema for updating a user"""
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     department: Optional[str] = Field(None, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
@@ -29,13 +26,11 @@ class UserUpdate(BaseModel):
 
 
 class UserChangePassword(BaseModel):
-    """Schema for changing user password"""
     old_password: str
     new_password: str = Field(..., min_length=6)
 
 
 class UserResponse(UserBase):
-    """Schema for user response"""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -48,7 +43,6 @@ class UserResponse(UserBase):
 
 
 class UserQRCode(BaseModel):
-    """Schema for user QR code information"""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -59,7 +53,6 @@ class UserQRCode(BaseModel):
 
 
 class UserListResponse(BaseModel):
-    """Schema for paginated user list"""
     users: list[UserResponse]
     total: int
     page: int
@@ -68,7 +61,6 @@ class UserListResponse(BaseModel):
 
 
 class UserStats(BaseModel):
-    """Schema for user statistics"""
     total_borrows: int
     active_borrows: int
     total_returns: int
