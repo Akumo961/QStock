@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 import os
 
 
@@ -63,6 +63,26 @@ class Settings(BaseSettings):
     # Option B: Ollama (local)
     OLLAMA_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "phi3:mini"
+
+    # AI Assistant tuning (all optional, safe defaults — only affect the
+    # chatbot's RAG answer-synthesis step, see src/ai/service.py)
+    AI_MAX_HISTORY_TURNS: int = 6        # conversation turns remembered per user
+    AI_ANSWER_MAX_TOKENS: int = 200      # max length of the synthesized answer (kept short for speed)
+    AI_ANSWER_NUM_CTX: int = 2048        # Ollama context window for the answer call
+    AI_CONTEXT_ROW_LIMIT: int = 30       # max retrieved rows fed into the answer prompt
+
+    # Optional: use a different (e.g. smaller/faster) model just for the
+    # conversational answer-phrasing step, separate from SQL generation.
+    # Leave empty to use OLLAMA_MODEL / OPENAI_MODEL for both steps (default).
+    OLLAMA_ANSWER_MODEL: str = ""
+    OPENAI_ANSWER_MODEL: str = ""
+
+    # Optional: force Ollama to offload this many model layers to GPU.
+    # Leave unset (None) to let Ollama auto-decide (default, safe choice).
+    # Useful if `ollama ps` shows a more CPU-heavy split than your GPU's
+    # VRAM should require — try a high number like 99; Ollama caps it at
+    # the model's real layer count automatically.
+    OLLAMA_NUM_GPU: Optional[int] = None
 
     class Config:
         env_file = ".env"

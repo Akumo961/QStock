@@ -33,4 +33,5 @@ User Question:
         user_message=enriched_message,
         requesting_user_id=current_user.id,
         language=body.language,
+        display_question=body.message,
     )
