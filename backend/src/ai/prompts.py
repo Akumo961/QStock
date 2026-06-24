@@ -1,5 +1,4 @@
 """
-prompts.py
 
 Prompt engineering for the Inventory AI Assistant.
 

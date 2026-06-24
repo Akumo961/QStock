@@ -66,10 +66,10 @@ class Settings(BaseSettings):
 
     # AI Assistant tuning (all optional, safe defaults — only affect the
     # chatbot's RAG answer-synthesis step, see src/ai/service.py)
-    AI_MAX_HISTORY_TURNS: int = 6        # conversation turns remembered per user
-    AI_ANSWER_MAX_TOKENS: int = 200      # max length of the synthesized answer (kept short for speed)
+    AI_MAX_HISTORY_TURNS: int = 3        # conversation turns remembered per user (kept short for speed)
+    AI_ANSWER_MAX_TOKENS: int = 120      # max length of the synthesized answer (kept short for speed)
     AI_ANSWER_NUM_CTX: int = 2048        # Ollama context window for the answer call
-    AI_CONTEXT_ROW_LIMIT: int = 30       # max retrieved rows fed into the answer prompt
+    AI_CONTEXT_ROW_LIMIT: int = 15       # max retrieved rows fed into the answer prompt (kept short for speed)
 
     # Optional: use a different (e.g. smaller/faster) model just for the
     # conversational answer-phrasing step, separate from SQL generation.

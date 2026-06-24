@@ -1,33 +1,3 @@
-"""
-memory.py
-
-Lightweight, in-process conversation memory for the AI Inventory Assistant.
-
-Why this exists
-----------------
-To feel like ChatGPT, the assistant needs to remember the last few turns of
-a conversation (e.g. "show me electronics" → "which of those are
-available?"). The original `rag-chatbot-master` reference project used
-LangChain's `ConversationBufferMemory` for this. Pulling in the full
-LangChain dependency stack just for an in-memory message buffer is not
-justified here, so this module reimplements the same idea — a small ring
-buffer of (question, answer) pairs per user — with zero new dependencies
-and zero database schema changes.
-
-Design notes
-------------
-- Keyed by `user_id` (already available on every authenticated request).
-- Bounded size (`maxlen`) so memory usage can never grow unbounded.
-- TTL-based expiry so a stale browser tab doesn't resurrect a week-old
-  conversation.
-- Thread-safe via a single module-level lock (the buffers themselves are
-  tiny, so contention is not a concern).
-- Process-local: in a multi-worker / multi-pod deployment, conversation
-  memory is per-process. This is a deliberate, documented trade-off (see
-  CHANGES.md) to avoid introducing new infrastructure (e.g. Redis) for a
-  "nice-to-have" continuity feature. If/when QStock adopts a shared cache,
-  swapping the storage backend here is a localized change.
-"""
 
 import threading
 import time
@@ -41,7 +11,7 @@ _LOCK = threading.Lock()
 _STORE: Dict[int, Deque[_HistoryEntry]] = {}
 _LAST_SEEN: Dict[int, float] = {}
 
-DEFAULT_MAX_TURNS = 6
+DEFAULT_MAX_TURNS = 3
 DEFAULT_TTL_SECONDS = 30 * 60  # 30 minutes of inactivity
 
 

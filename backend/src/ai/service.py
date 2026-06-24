@@ -1,5 +1,4 @@
 """
-service.py
 
 AI Inventory Assistant — core pipeline (Retrieval-Augmented Generation
 over the live SQL database).
@@ -132,7 +131,7 @@ class AIProvider(ABC):
     def complete(
         self,
         messages: List[Dict[str, str]],
-        max_tokens: int = 128,
+        max_tokens: int = 100,
         temperature: float = 0.0,
         num_ctx: int = 2048,
     ) -> str:
@@ -171,7 +170,7 @@ class OllamaProvider(AIProvider):
     def complete(
         self,
         messages: List[Dict[str, str]],
-        max_tokens: int = 128,
+        max_tokens: int = 100,
         temperature: float = 0.0,
         num_ctx: int = 2048,
     ) -> str:
@@ -227,7 +226,7 @@ class OpenAIProvider(AIProvider):
     def complete(
         self,
         messages: List[Dict[str, str]],
-        max_tokens: int = 128,
+        max_tokens: int = 100,
         temperature: float = 0.0,
         num_ctx: int = 2048,  # noqa: ARG002 - not applicable to OpenAI, kept for interface parity
     ) -> str:
@@ -435,7 +434,7 @@ def handle_chat(
 
     try:
         logger.info("START SQL GENERATION")
-        raw_llm = provider.complete(sql_messages)  # defaults: max_tokens=128, temperature=0.0, num_ctx=2048
+        raw_llm = provider.complete(sql_messages)  # defaults: max_tokens=100, temperature=0.0, num_ctx=2048
         logger.info("END SQL GENERATION")
         logger.info(
             "LLM SQL generation took %.2fs",
@@ -605,8 +604,8 @@ def _generate_natural_answer(
     prompts.build_answer_system_prompt — the model is instructed to use
     ONLY the rows passed in `data_block` and nothing else.
     """
-    row_limit = getattr(settings, "AI_CONTEXT_ROW_LIMIT", 30)
-    max_tokens = getattr(settings, "AI_ANSWER_MAX_TOKENS", 200)
+    row_limit = getattr(settings, "AI_CONTEXT_ROW_LIMIT", 15)
+    max_tokens = getattr(settings, "AI_ANSWER_MAX_TOKENS", 120)
 
     data_block = _serialize_rows_for_prompt(rows, row_limit)
 
