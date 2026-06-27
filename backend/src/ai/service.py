@@ -72,6 +72,22 @@ MAX_ROWS = 100
 # Statement timeout in milliseconds (PostgreSQL session-level).
 QUERY_TIMEOUT_MS = 10_000
 
+# Belt-and-suspenders redaction: even though sql_guard.validate_sql() already
+# rejects queries that reference these columns by name, this second check at
+# the result layer guarantees they never reach the LLM or the frontend even
+# if a future change to the guard's regex (or a column added later) slips
+# through. Matched case-insensitively against the column name returned by
+# the database driver.
+_REDACTED_COLUMN_NAMES = {
+    "hashed_password",
+    "password",
+    "qr_code_image",
+    "secret",
+    "api_key",
+    "access_token",
+    "refresh_token",
+}
+
 # ---------------------------------------------------------------------------
 # Bilingual fallback / error strings.
 #
@@ -328,6 +344,21 @@ def _execute_safe_select(db: Session, sql: str) -> List[Dict[str, Any]]:
     result = db.execute(text(sql))
     columns = list(result.keys())
     rows = [dict(zip(columns, row)) for row in result.fetchmany(MAX_ROWS)]
+
+    # Defense-in-depth: drop any column that slipped past sql_guard (see
+    # _REDACTED_COLUMN_NAMES above) before this data ever reaches the LLM
+    # or the HTTP response.
+    redacted_cols = [c for c in columns if c.lower() in _REDACTED_COLUMN_NAMES]
+    if redacted_cols:
+        logger.warning(
+            "Redacting sensitive column(s) %s from AI query result that "
+            "unexpectedly passed sql_guard: %s",
+            redacted_cols, sql,
+        )
+        for row in rows:
+            for col in redacted_cols:
+                row.pop(col, None)
+
     return rows
 
 

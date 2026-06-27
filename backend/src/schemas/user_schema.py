@@ -7,7 +7,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
     department: Optional[str] = Field(None, max_length=100)
-    phone: Optional[str] = Field(None, max_length=20)
+    phone: str = Field(..., min_length=5, max_length=20, description="Required for every account, admin or regular user")
     employee_id: Optional[str] = Field(None, max_length=50)
 
 
@@ -19,7 +19,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=255)
     department: Optional[str] = Field(None, max_length=100)
-    phone: Optional[str] = Field(None, max_length=20)
+    phone: Optional[str] = Field(None, min_length=5, max_length=20, description="If provided, cannot be blanked out — phone is mandatory once set")
     employee_id: Optional[str] = Field(None, max_length=50)
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None

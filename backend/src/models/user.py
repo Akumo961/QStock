@@ -24,7 +24,7 @@ class User(BaseModel):
 
     # Optional Fields
     department = Column(String(100), nullable=True)
-    phone = Column(String(20), nullable=True)
+    phone = Column(String(20), nullable=False)
     employee_id = Column(String(50), unique=True, nullable=True)
 
     # =========================================================================

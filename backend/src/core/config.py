@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_EMAIL: str = "ali.el-sayed-ali@scouthorizon.onmicrosoft.com"
     INITIAL_ADMIN_PASSWORD: str = "K41d0Dr@gonW0r1d!"
     INITIAL_ADMIN_NAME: str = "System Administrator"
+    INITIAL_ADMIN_PHONE: str = "+1-000-000-0000"
 
     # -------------------------------------------------------------------------
     # AI Assistant (optional — set one of the two blocks below)

@@ -90,21 +90,14 @@ const QRScanner: React.FC<QRScannerProps> = ({
     window.isSecureContext;
 
   // Get available cameras
-  useEffect(() => {
   const loadCameras = async () => {
-    console.log("========== QR DEBUG ==========");
-    console.log("Secure Context:", window.isSecureContext);
-    console.log("Protocol:", window.location.protocol);
-    console.log("Hostname:", window.location.hostname);
-    console.log("MediaDevices:", navigator.mediaDevices);
-
     if (!window.isSecureContext) {
       setError(
         fr
           ? 'Contexte non sécurisé. HTTPS requis pour accéder à la caméra.'
           : 'Insecure context. HTTPS is required for camera access.'
       );
-      return;
+      return false;
     }
 
     if (!navigator.mediaDevices) {
@@ -113,13 +106,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
           ? 'navigator.mediaDevices est indisponible.'
           : 'navigator.mediaDevices is unavailable.'
       );
-      return;
+      return false;
     }
 
     try {
       const devices = await Html5Qrcode.getCameras();
-
-      console.log("Cameras found:", devices);
 
       if (!devices || devices.length === 0) {
         setError(
@@ -127,7 +118,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
             ? 'Aucune caméra détectée.'
             : 'No camera detected.'
         );
-        return;
+        return false;
       }
 
       const cameraDevices: CameraDevice[] = devices.map((device) => ({
@@ -144,51 +135,69 @@ const QRScanner: React.FC<QRScannerProps> = ({
           camera.label.toLowerCase().includes('environment')
       );
 
-      setSelectedCamera(
-        rearCamera?.id || cameraDevices[0].id
-      );
+      const chosen = rearCamera?.id || cameraDevices[0].id;
+      setSelectedCamera(chosen);
+      return chosen;
     } catch (err: any) {
-      console.error("GET CAMERAS ERROR:", err);
-
-      setError(
-        `${err?.name || 'Unknown Error'} : ${
-          err?.message || 'No message'
-        }`
-      );
+      setHasPermission(false);
+      if (err?.name === 'NotAllowedError') {
+        setError(
+          fr
+            ? "Accès à la caméra refusé. Cliquez sur l'icône de caméra/cadenas dans la barre d'adresse de votre navigateur pour autoriser l'accès, puis réessayez — ou utilisez l'option « Scanner une image » ci-dessous."
+            : "Camera access was blocked. Click the camera/lock icon in your browser's address bar to allow access, then try again — or use \"Scan Image File\" below instead."
+        );
+      } else if (err?.name === 'NotFoundError') {
+        setError(fr ? 'Aucune caméra trouvée sur cet appareil.' : 'No camera found on this device.');
+      } else if (err?.name === 'NotReadableError') {
+        setError(
+          fr
+            ? 'La caméra est déjà utilisée par une autre application ou un autre onglet.'
+            : 'The camera is already in use by another app or browser tab.'
+        );
+      } else {
+        setError(`${err?.name || 'Camera Error'}: ${err?.message || 'Unable to access the camera.'}`);
+      }
+      return false;
     }
   };
 
-  loadCameras();
-}, [fr]);
-
   // Request camera permission
   const requestCameraPermission = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "environment",
-      },
-    });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+        },
+      });
 
-    stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
 
-    setHasPermission(true);
+      setHasPermission(true);
+      setError('');
 
-    return true;
-  } catch (err: any) {
-    console.error("PERMISSION ERROR:", err);
+      return true;
+    } catch (err: any) {
+      setHasPermission(false);
 
-    setHasPermission(false);
+      if (err?.name === 'NotAllowedError') {
+        setError(
+          fr
+            ? "Accès à la caméra refusé. Cliquez sur l'icône de caméra/cadenas dans la barre d'adresse de votre navigateur pour autoriser l'accès, puis cliquez sur « Démarrer le scan » à nouveau — ou utilisez « Scanner une image » ci-dessous."
+            : "Camera access was blocked. Click the camera/lock icon in your browser's address bar to allow access, then click \"Start Scanning\" again — or use \"Scan Image File\" below instead."
+        );
+      } else if (err?.name === 'NotReadableError') {
+        setError(
+          fr
+            ? 'La caméra est déjà utilisée par une autre application ou un autre onglet.'
+            : 'The camera is already in use by another app or browser tab.'
+        );
+      } else {
+        setError(`${err?.name || 'Permission Error'}: ${err?.message || 'Unable to access the camera.'}`);
+      }
 
-    setError(
-      `${err?.name || "Permission Error"} : ${
-        err?.message || ""
-      }`
-    );
-
-    return false;
-  }
-};
+      return false;
+    }
+  };
 
   // Start scanning
   const startScanning = async (cameraId?: string) => {
@@ -197,34 +206,30 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
     // Check if already scanning
     if (scanner.getState() === Html5QrcodeScannerState.SCANNING) {
-      console.log('Scanner already running');
       return;
     }
 
-    // Request permission first
+    setError('');
+
+    // Enumerate cameras lazily, on this user gesture, the first time the
+    // user clicks Start — this is what the browser's permission prompt is
+    // tied to, so doing it here (rather than automatically on page load)
+    // is what makes the prompt actually appear and succeed reliably.
+    let cameraToUse: string | false | undefined = cameraId || selectedCamera;
+    if (!cameraToUse) {
+      cameraToUse = await loadCameras();
+      if (!cameraToUse) return; // loadCameras already set a helpful error
+    }
+
+    // Confirm permission (separate from enumeration — some browsers grant
+    // device listing but still need an explicit getUserMedia confirmation).
     const hasAccess = await requestCameraPermission();
     if (!hasAccess) return;
 
-    const cameraToUse = cameraId || selectedCamera;
-    if (!cameraToUse) {
-      setError(fr ? 'Aucune caméra sélectionnée' : 'No camera selected');
-      return;
-    }
+    try {
+      setIsScanning(true);
 
-    try{
-      setError('');
-
-    console.log("========== START SCANNER ==========");
-    console.log("Selected camera:", cameraToUse);
-    console.log("Permission state:", hasPermission);
-    console.log("Available cameras:", cameras);
-    console.log("Scanner state:", scanner.getState());
-    console.log("Secure context:", window.isSecureContext);
-    console.log("MediaDevices:", navigator.mediaDevices);
-
-  setIsScanning(true);
-
-  await scanner.start(
+      await scanner.start(
         cameraToUse,
         {
           fps,
@@ -254,22 +259,19 @@ const QRScanner: React.FC<QRScannerProps> = ({
         }
       );
     } catch (err: any) {
-      console.error("START ERROR:", err);
-
-      setError(
-        JSON.stringify(
-         {
-            name: err?.name,
-            message: err?.message,
-            stack: err?.stack,
-         },
-         null,
-         2
-       )
-    );
+      setIsScanning(false);
+      if (err?.name === 'NotAllowedError') {
+        setError(
+          fr
+            ? "Accès à la caméra refusé. Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur, puis réessayez."
+            : 'Camera access was blocked. Please allow camera access in your browser settings, then try again.'
+        );
+      } else {
+        setError(`${err?.name || 'Scanner Error'}: ${err?.message || 'Unable to start the camera.'}`);
+      }
 
       if (onScanError) {
-        onScanError(err.message);
+        onScanError(err?.message || String(err));
       }
     }
   };
@@ -476,7 +478,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
             size="large"
             startIcon={<CameraAlt />}
             onClick={() => startScanning()}
-            disabled={!isCameraAvailable || !selectedCamera || hasPermission === false}
+            disabled={!isCameraAvailable}
             sx={{ minWidth: 200 }}
           >
             {fr ? 'Démarrer le scan' : 'Start Scanning'}
@@ -494,9 +496,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
           </Button>
         )}
 
-        {/* File upload fallback — works on HTTP */}
+        {/* File upload fallback — works even without camera permission */}
         <Button
-          variant="outlined"
+          variant={error ? 'contained' : 'outlined'}
+          color={error ? 'primary' : 'inherit'}
           size="large"
           component="label"
           sx={{ minWidth: 200 }}
@@ -511,6 +514,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
               if (!file || !scannerRef.current) return;
               try {
                 const result = await scannerRef.current.scanFile(file, true);
+                setError('');
                 onScanSuccess(result, null);
               } catch {
                 setError(fr ? 'Impossible de lire le QR code dans cette image.' : 'Could not read QR code from this image.');

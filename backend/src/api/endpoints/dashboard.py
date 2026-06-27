@@ -513,7 +513,9 @@ async def get_item_utilization(
         # Calculate utilization rate (borrows per month since creation)
         item_obj = db.query(Item).filter(Item.id == item.id).first()
         if item_obj:
-            days_since_creation = (datetime.utcnow() - item_obj.created_at).days or 1
+            created_at = item_obj.created_at
+            now = datetime.now(created_at.tzinfo) if created_at.tzinfo else datetime.utcnow()
+            days_since_creation = (now - created_at).days or 1
             months_since_creation = days_since_creation / 30.0
             utilization_rate = item.borrow_count / months_since_creation if months_since_creation > 0 else 0
         else:

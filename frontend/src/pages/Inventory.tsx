@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Typography, Grid, Card, CardContent,
@@ -221,11 +220,17 @@ const Inventory: React.FC = () => {
                   <TableCell sx={{ fontWeight: 700 }}>{language === 'fr' ? 'Disponible' : 'Available'}</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>{language === 'fr' ? 'Colonne (A–Z)' : 'Column (A–Z)'}</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>{language === 'fr' ? 'Rangée (1–6)' : 'Row (1–6)'}</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }} align="right">{language === 'fr' ? 'Actions' : 'Actions'}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {items.map((item) => (
-                  <TableRow key={item.id} hover>
+                  <TableRow
+                    key={item.id}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => { setSelectedItem(item); setShowDetailsDialog(true); }}
+                  >
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                         <Avatar sx={{ bgcolor: '#1b4332', width: 32, height: 32 }}>
@@ -258,6 +263,26 @@ const Inventory: React.FC = () => {
                         size="small"
                         sx={{ bgcolor: '#2d6a4f', color: 'white', fontWeight: 700, minWidth: 36 }}
                       />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Tooltip title={language === 'fr' ? 'Détails' : 'Details'}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setShowDetailsDialog(true); }}
+                        >
+                          <Info fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      {item.qr_code_data && (
+                        <Tooltip title={t('qrCode')}>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setShowQRDialog(true); }}
+                          >
+                            <QrCode2 fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

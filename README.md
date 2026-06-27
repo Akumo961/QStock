@@ -2,7 +2,7 @@
 
 **Modern Inventory Management with QR Code Technology**
 
-*Built for Scouts Musulmans de Montréal - Kashef*
+*Built for Scouts Musulmans de Montréal*
 
 ---
 

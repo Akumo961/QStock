@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box, Card, CardContent, Typography, Button, TextField,
@@ -40,6 +39,7 @@ interface ItemFormData {
   category: string;
   status: string;
   quantity: number;
+  available_quantity: number;
   is_borrowable: boolean;
   max_borrow_days: number;
   location: string;   // stored as "A3", "B6", etc.
@@ -76,6 +76,7 @@ const defaultForm = (): ItemFormData => ({
   category: 'other',
   status: 'available',
   quantity: 1,
+  available_quantity: 1,
   is_borrowable: true,
   max_borrow_days: 7,
   location: '',
@@ -138,6 +139,7 @@ const ItemManagement: React.FC = () => {
         category: item.category?.toLowerCase() || 'other',
         status: item.status?.toLowerCase() || 'available',
         quantity: item.quantity,
+        available_quantity: item.available_quantity,
         is_borrowable: item.is_borrowable,
         max_borrow_days: item.max_borrow_days || 7,
         location: item.location || '',
@@ -627,8 +629,39 @@ const ItemManagement: React.FC = () => {
             {/* Quantity */}
             <Grid item xs={12} sm={6}>
               <TextField fullWidth required label={t('quantity')} type="number" value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                onChange={(e) => {
+                  const newQty = Math.max(1, parseInt(e.target.value) || 1);
+                  setFormData({
+                    ...formData,
+                    quantity: newQty,
+                    // Keep available_quantity in range whenever the total changes
+                    available_quantity: Math.min(formData.available_quantity, newQty),
+                  });
+                }}
                 inputProps={{ min: 1 }} disabled={saving} />
+            </Grid>
+
+            {/* Available Quantity — how many of the total are available right now */}
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                label={language === 'fr' ? 'Quantité disponible' : 'Available Quantity'}
+                type="number"
+                value={formData.available_quantity}
+                onChange={(e) => {
+                  const raw = parseInt(e.target.value);
+                  const clamped = Math.max(0, Math.min(isNaN(raw) ? 0 : raw, formData.quantity));
+                  setFormData({ ...formData, available_quantity: clamped });
+                }}
+                inputProps={{ min: 0, max: formData.quantity }}
+                helperText={
+                  language === 'fr'
+                    ? `Sur un total de ${formData.quantity}`
+                    : `Out of a total of ${formData.quantity}`
+                }
+                disabled={saving}
+              />
             </Grid>
 
             {/* Column A–Z */}

@@ -21,6 +21,7 @@ from src.api.endpoints.orders import router as orders_router
 from src.api.endpoints.dashboard import router as dashboard_router
 from src.api.endpoints.reviews import router as reviews_router
 from src.api.endpoints.ai import router as ai_router
+from src.api.endpoints.reports import router as reports_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
                 email=settings.INITIAL_ADMIN_EMAIL,
                 full_name=settings.INITIAL_ADMIN_NAME,
                 hashed_password=hashed_password,
+                phone=settings.INITIAL_ADMIN_PHONE,
                 is_admin=True,
                 is_active=True,
                 qr_code_data="temp"
@@ -143,6 +145,7 @@ app.include_router(orders_router,       prefix="/api/orders",        tags=["Orde
 app.include_router(dashboard_router,    prefix="/api/dashboard",     tags=["Dashboard"])
 app.include_router(reviews_router,      prefix="/api/reviews",       tags=["Reviews"])
 app.include_router(ai_router,           prefix="/api/ai",            tags=["AI Assistant"])
+app.include_router(reports_router,      prefix="/api/reports",       tags=["Reports"])
 
 
 # Global exception handler

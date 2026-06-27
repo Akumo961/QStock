@@ -57,6 +57,23 @@ async def create_item(
             detail="Item limit reached (max 1000 items)"
         )
 
+    # How many of the total quantity are available right now. Defaults to
+    # the full quantity (everything is available on creation) unless the
+    # admin specifies otherwise — but can never exceed quantity.
+    available_quantity = (
+        item_data.available_quantity
+        if item_data.available_quantity is not None
+        else item_data.quantity
+    )
+    if available_quantity > item_data.quantity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"available_quantity ({available_quantity}) cannot exceed "
+                f"quantity ({item_data.quantity})."
+            ),
+        )
+
     # Count admins if creating an admin item (not applicable here, handled in users)
 
     # FIX: Convert empty strings to None for UNIQUE-constrained nullable fields.
@@ -77,7 +94,7 @@ async def create_item(
         purchase_date=item_data.purchase_date,
         location=empty_to_none(item_data.location),
         quantity=item_data.quantity,
-        available_quantity=item_data.quantity,
+        available_quantity=available_quantity,
         is_borrowable=item_data.is_borrowable,
         requires_approval=item_data.requires_approval,
         max_borrow_days=item_data.max_borrow_days,
@@ -296,6 +313,26 @@ async def update_item(
     # FIX: Convert empty strings to None for UNIQUE-constrained nullable fields
     NULLABLE_UNIQUE = {'serial_number', 'brand', 'model', 'location', 'description', 'notes', 'image_url'}
     update_data = item_update.model_dump(exclude_unset=True)
+
+    # Admin can change quantity / available_quantity freely, at any moment.
+    # Rather than ever blocking the request, the system keeps the numbers
+    # sane automatically: available_quantity is clamped into [0, quantity].
+    currently_borrowed = item.quantity - item.available_quantity
+    new_quantity = update_data.get('quantity', item.quantity)
+    new_available_quantity = update_data.get('available_quantity', item.available_quantity)
+
+    if 'quantity' in update_data and 'available_quantity' not in update_data:
+        # Quantity changed but available_quantity wasn't explicitly set —
+        # keep the same number of items "currently borrowed" consistent,
+        # clamping at 0 instead of rejecting the update.
+        new_available_quantity = max(0, new_quantity - currently_borrowed)
+        update_data['available_quantity'] = new_available_quantity
+
+    # Clamp into a sane range instead of erroring — the admin always has
+    # final say over their own inventory numbers.
+    new_available_quantity = max(0, min(new_available_quantity, new_quantity))
+    update_data['available_quantity'] = new_available_quantity
+
     for field, value in update_data.items():
         if value == '' and field in NULLABLE_UNIQUE:
             value = None

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Box, Container, Typography, Card, CardContent,
@@ -134,15 +133,15 @@ const Scanner: React.FC = () => {
                   <Typography variant="body2" component="div">
                     {language === 'fr' ? (
                       <>
-                        1. Scannez d'abord votre code QR utilisateur<br />
-                        2. Puis scannez le code QR de l'article<br />
-                        3. Suivez les instructions pour compléter la transaction
+                        Scannez un code QR ici pour l'identifier rapidement, puis utilisez les
+                        boutons pour continuer vers l'onglet Emprunter ou Retourner — chacun
+                        vous guidera à travers le scan complet (utilisateur puis article).
                       </>
                     ) : (
                       <>
-                        1. Scan your user QR code first<br />
-                        2. Then scan the item QR code<br />
-                        3. Follow the prompts to complete the transaction
+                        Scan a QR code here to quickly identify it, then use the buttons to
+                        continue to the Borrow or Return tab — each one will guide you through
+                        the full scan flow (user card, then item).
                       </>
                     )}
                   </Typography>
@@ -153,9 +152,34 @@ const Scanner: React.FC = () => {
                 <Typography variant="h6" gutterBottom>
                   {language === 'fr' ? 'Code QR scanné !' : 'QR Code Scanned!'}
                 </Typography>
-                <Chip label={scannedData} sx={{ mb: 3 }} />
-                <Box>
-                  <Button variant="contained" onClick={resetScanner} sx={{ mr: 2, bgcolor: '#2d6a4f' }}>
+                <Chip label={scannedData} sx={{ mb: 1 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  {mode === 'borrow'
+                    ? (language === 'fr'
+                        ? "Article détecté. Continuez vers l'onglet Emprunter ou Retourner pour terminer."
+                        : 'Item detected. Continue to the Borrow or Return tab to finish.')
+                    : (language === 'fr'
+                        ? "Carte utilisateur détectée. Continuez vers l'onglet Emprunter ou Retourner."
+                        : 'User card detected. Continue to the Borrow or Return tab.')}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => { setActiveTab(1); resetScanner(); }}
+                    sx={{ bgcolor: '#2d6a4f' }}
+                  >
+                    {language === 'fr' ? 'Aller à Emprunter' : 'Go to Borrow'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<KeyboardReturn />}
+                    onClick={() => { setActiveTab(2); resetScanner(); }}
+                    sx={{ bgcolor: '#1b4332' }}
+                  >
+                    {language === 'fr' ? 'Aller à Retourner' : 'Go to Return'}
+                  </Button>
+                  <Button variant="outlined" onClick={resetScanner}>
                     {language === 'fr' ? 'Scanner à nouveau' : 'Scan Again'}
                   </Button>
                 </Box>

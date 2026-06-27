@@ -70,7 +70,7 @@ interface UserFormData {
   password: string;
   is_admin: boolean;
   department?: string;
-  phone?: string;
+  phone: string;
   employee_id?: string;
 }
 
@@ -191,6 +191,11 @@ const UserManagement: React.FC = () => {
 
   const handleSubmit = async () => {
     setError('');
+
+    if (!formData.phone || !formData.phone.trim()) {
+      setError(fr ? 'Le numéro de téléphone est obligatoire' : 'Phone number is required');
+      return;
+    }
 
     try {
       const url =
@@ -732,6 +737,8 @@ const UserManagement: React.FC = () => {
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
+                required
+                helperText={fr ? "Obligatoire pour tous les comptes" : "Required for every account"}
               />
             </Grid>
             <Grid item xs={12}>

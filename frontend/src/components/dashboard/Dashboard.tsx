@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Box, CircularProgress, Alert, Typography, Grid, Paper } from '@mui/material';
 import { People, Inventory, Assignment, Warning } from '@mui/icons-material';
@@ -24,11 +23,18 @@ interface DashboardStats {
   total_reviews?: number;
 }
 
+interface BorrowingTrend {
+  date: string;
+  borrow_count: number;
+  return_count: number;
+}
+
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const { t, language } = useLanguage();
 
   const [stats, setStats] = useState<DashboardStats>({});
+  const [trends, setTrends] = useState<BorrowingTrend[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const lastFetchRef = React.useRef<number>(0);
@@ -41,10 +47,28 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       setError('');
       try {
-        setStats(await dashboardAPI.getStats());
+        const [statsResult, trendsResult] = await Promise.allSettled([
+          dashboardAPI.getStats(),
+          dashboardAPI.getBorrowingTrends({ days: 7 }),
+        ]);
+
+        if (statsResult.status === 'fulfilled') {
+          setStats(statsResult.value);
+        } else {
+          throw statsResult.reason;
+        }
+
+        // Trends are a "nice to have" enhancement to the chart — don't fail
+        // the whole dashboard if only this secondary call breaks.
+        if (trendsResult.status === 'fulfilled') {
+          setTrends(trendsResult.value);
+        } else {
+          setTrends([]);
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load stats');
         setStats({});
+        setTrends([]);
       } finally {
         setLoading(false);
       }
@@ -69,14 +93,19 @@ const AdminDashboard: React.FC = () => {
     },
   };
 
+  // Real per-day borrow counts for the last 7 days, straight from
+  // /api/dashboard/borrowing-trends — no placeholder/mock numbers.
   const barChartData = {
-    labels: language === 'fr'
-      ? ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun']
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    labels: trends.map((d) =>
+      new Date(d.date).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+    ),
     datasets: [
       {
         label: language === 'fr' ? 'Articles empruntés' : 'Borrowed Items',
-        data: [stats.total_transactions ?? 0, 12, 18, 14, 9, stats.active_borrows ?? 0],
+        data: trends.map((d) => d.borrow_count),
         backgroundColor: 'rgba(45, 106, 79, 0.6)',
         borderColor: '#2d6a4f',
         borderWidth: 2,
@@ -143,7 +172,7 @@ const AdminDashboard: React.FC = () => {
             <Grid item xs={12} md={8}>
               <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#1b4332' }}>
-                  {language === 'fr' ? 'Tendances mensuelles' : 'Monthly Trends'}
+                  {language === 'fr' ? 'Emprunts (7 derniers jours)' : 'Borrows (Last 7 Days)'}
                 </Typography>
                 <BarChart data={barChartData} />
               </Paper>

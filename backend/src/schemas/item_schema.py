@@ -33,6 +33,10 @@ class ItemBase(BaseModel):
 class ItemCreate(ItemBase):
     """Schema for creating a new item"""
     item_code: Optional[str] = Field(None, max_length=100)
+    available_quantity: Optional[int] = Field(
+        None, ge=0,
+        description="How many of `quantity` are available right now. Defaults to the full quantity if omitted. Cannot exceed quantity.",
+    )
 
 
 class ItemUpdate(BaseModel):

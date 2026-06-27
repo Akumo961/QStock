@@ -1,6 +1,4 @@
 """
-sql_guard.py
-
 Validates LLM-generated SQL before it is ever sent to the database.
 
 Rules enforced
@@ -9,6 +7,8 @@ Rules enforced
 2. Banned keywords: INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, REVOKE.
 3. Multiple statements (semicolons not at the very end) are rejected.
 4. Empty / whitespace-only queries are rejected.
+5. Sensitive columns (credentials, secrets, raw QR payloads) may never be
+   selected, by name or via a wildcard on a table that contains them.
 
 The guard works on the *raw* SQL string returned by the LLM, before any
 execution attempt.  It is intentionally conservative: when in doubt, reject.
@@ -45,6 +45,41 @@ _BANNED_RE = re.compile(
 # trimmed string indicate a second statement.
 _MULTI_STMT_RE = re.compile(r";(?!\s*$)")
 
+# ---------------------------------------------------------------------------
+# Sensitive-data protection.
+#
+# The AI assistant is exposed to every authenticated user, not just admins
+# (see src/api/endpoints/ai.py — only `get_current_user` is required). The
+# documented SCHEMA_DESCRIPTION in prompts.py intentionally never mentions
+# these columns, but an LLM can still guess common column names (e.g.
+# "hashed_password") and the database itself has no column-level ACL for
+# this read-only connection. These checks are the actual enforcement point.
+# ---------------------------------------------------------------------------
+
+_SENSITIVE_COLUMNS: list[str] = [
+    "hashed_password",
+    "password",
+    "qr_code_image",   # large base64 PNG payload, not useful to a chat answer
+    "secret",
+    "api_key",
+    "access_token",
+    "refresh_token",
+]
+
+_SENSITIVE_COLUMN_RE = re.compile(
+    r"\b(?:" + "|".join(_SENSITIVE_COLUMNS) + r")\b",
+    re.IGNORECASE,
+)
+
+# A bare `SELECT *` (or `SELECT alias.*`) against the `users` table would
+# pull hashed_password/qr_code_image/qr_code_data along with everything
+# else, even though no single forbidden column name appears in the query
+# text. Block wildcard selection whenever "users" appears anywhere in the
+# statement (covers `FROM users`, `JOIN users`, aliased forms, etc.) — this
+# is intentionally conservative.
+_WILDCARD_RE = re.compile(r"SELECT\s+(?:\*|\w+\.\*)", re.IGNORECASE)
+_USERS_TABLE_RE = re.compile(r"\busers\b", re.IGNORECASE)
+
 
 def validate_sql(sql: str) -> Tuple[bool, str]:
     """
@@ -74,7 +109,19 @@ def validate_sql(sql: str) -> Tuple[bool, str]:
     if _MULTI_STMT_RE.search(cleaned):
         return False, "Multiple SQL statements are not allowed."
 
-    # ---- 4. Strip trailing semicolon for safety ---------------------------
+    # ---- 4. No sensitive columns by name -----------------------------------
+    sensitive_match = _SENSITIVE_COLUMN_RE.search(cleaned)
+    if sensitive_match:
+        return False, f"Query references a restricted column: {sensitive_match.group()!r}."
+
+    # ---- 5. No wildcard SELECT against the users table ---------------------
+    if _USERS_TABLE_RE.search(cleaned) and _WILDCARD_RE.search(cleaned):
+        return False, (
+            "Wildcard SELECT against the users table is not allowed; "
+            "select specific non-sensitive columns instead."
+        )
+
+    # ---- 6. Strip trailing semicolon for safety ---------------------------
     cleaned = cleaned.rstrip(";").strip()
 
     return True, cleaned

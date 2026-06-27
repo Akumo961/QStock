@@ -3,7 +3,7 @@
 Prompt engineering for the Inventory AI Assistant.
 
 Designed for:
-- Ollama (llama3)
+- Ollama
 - PostgreSQL
 - English + French users
 
@@ -20,6 +20,8 @@ TABLE items
 -------------
 id
 name
+item_code
+qr_code_data
 category
 status
 quantity
@@ -53,9 +55,12 @@ TABLE requests
 id
 user_id
 item_id
+order_type
 title
+description
 status
 priority
+needed_date
 created_at
 """
 
@@ -80,23 +85,31 @@ items.category values:
 
 - electronics
 - school_items
+- decorations
+- clothes
+- games
+- other
 
 items.status values:
 
 - available
 - borrowed
 - maintenance
+- retired
 
 transactions.status values:
 
 - borrowed
 - returned
+- overdue
+- cancelled
 
 requests.status values:
 
 - pending
 - approved
 - rejected
+- ready
 
 ====================================================
 FRENCH TO DATABASE VALUE MAPPINGS
@@ -164,6 +177,80 @@ rendus
 must map to:
 
 returned
+
+----------------------------------------------------
+
+décoration
+décorations
+article de décoration
+articles de décoration
+
+must map to:
+
+decorations
+
+----------------------------------------------------
+
+vêtement
+vêtements
+habit
+habits
+
+must map to:
+
+clothes
+
+----------------------------------------------------
+
+jeu
+jeux
+jouet
+jouets
+
+must map to:
+
+games
+
+----------------------------------------------------
+
+retraité
+retirée
+retirées
+hors service
+
+must map to:
+
+retired
+
+----------------------------------------------------
+
+en retard
+en souffrance
+
+must map to:
+
+overdue
+
+----------------------------------------------------
+
+annulé
+annulée
+annulés
+
+must map to:
+
+cancelled
+
+----------------------------------------------------
+
+prêt
+prête
+prêtes
+prêts
+
+must map to:
+
+ready
 
 ====================================================
 IMPORTANT SQL RULES

@@ -12,7 +12,18 @@ interface BarChartProps {
 }
 
 const BarChart: React.FC<BarChartProps> = ({ data }) => {
-  const maxValue = Math.max(...data.datasets[0].data);
+  const values = data.datasets[0]?.data ?? [];
+  const labels = data.labels ?? [];
+
+  if (values.length === 0) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: '#888' }}>
+        No data available
+      </div>
+    );
+  }
+
+  const maxValue = Math.max(...values, 0) || 1; // avoid divide-by-zero when every value is 0
 
   return (
     <div>
@@ -23,7 +34,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
         <line x1="50" y1="250" x2="450" y2="250" stroke="black" strokeWidth="2" />
 
         {/* Bars */}
-        {data.datasets[0].data.map((value, index) => {
+        {values.map((value, index) => {
           const barWidth = 40;
           const spacing = 20;
           const x = 60 + index * (barWidth + spacing);
@@ -40,7 +51,7 @@ const BarChart: React.FC<BarChartProps> = ({ data }) => {
                 fill={data.datasets[0].backgroundColor || '#1976d2'}
               />
               <text x={x + barWidth / 2} y="270" textAnchor="middle" fontSize="12">
-                {data.labels[index]}
+                {labels[index]}
               </text>
               <text x={x + barWidth / 2} y={y - 5} textAnchor="middle" fontSize="12">
                 {value}
