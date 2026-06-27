@@ -7,7 +7,8 @@ Rules enforced
 2. Banned keywords: INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT, REVOKE.
 3. Multiple statements (semicolons not at the very end) are rejected.
 4. Empty / whitespace-only queries are rejected.
-5. Sensitive columns (credentials, secrets, raw QR payloads) may never be
+5. Wildcard SELECT is never allowed.
+6. Sensitive columns (credentials, secrets, raw QR payloads) may never be
    selected, by name or via a wildcard on a table that contains them.
 
 The guard works on the *raw* SQL string returned by the LLM, before any
@@ -77,8 +78,15 @@ _SENSITIVE_COLUMN_RE = re.compile(
 # text. Block wildcard selection whenever "users" appears anywhere in the
 # statement (covers `FROM users`, `JOIN users`, aliased forms, etc.) — this
 # is intentionally conservative.
-_WILDCARD_RE = re.compile(r"SELECT\s+(?:\*|\w+\.\*)", re.IGNORECASE)
+_WILDCARD_RE = re.compile(
+    r"\bSELECT\s+(?:\*|[a-zA-Z_][a-zA-Z0-9_]*\.\*)|,\s*(?:\*|[a-zA-Z_][a-zA-Z0-9_]*\.\*)",
+    re.IGNORECASE,
+)
 _USERS_TABLE_RE = re.compile(r"\busers\b", re.IGNORECASE)
+
+_COMMENT_RE = re.compile(r"(--|/\*)")
+_TABLE_REFERENCE_RE = re.compile(r"\b(?:FROM|JOIN)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b", re.IGNORECASE)
+_ALLOWED_TABLES = {"items", "users", "transactions", "requests"}
 
 
 def validate_sql(sql: str) -> Tuple[bool, str]:
@@ -109,19 +117,36 @@ def validate_sql(sql: str) -> Tuple[bool, str]:
     if _MULTI_STMT_RE.search(cleaned):
         return False, "Multiple SQL statements are not allowed."
 
-    # ---- 4. No sensitive columns by name -----------------------------------
+    # ---- 4. No comments ----------------------------------------------------
+    if _COMMENT_RE.search(cleaned):
+        return False, "SQL comments are not allowed."
+
+    # ---- 5. No wildcard SELECT anywhere ------------------------------------
+    if _WILDCARD_RE.search(cleaned):
+        return False, "Wildcard SELECT is not allowed; select specific columns."
+
+    # ---- 6. Only known application tables ----------------------------------
+    referenced_tables = {match.group(1).lower() for match in _TABLE_REFERENCE_RE.finditer(cleaned)}
+    unknown_tables = referenced_tables - _ALLOWED_TABLES
+    if unknown_tables:
+        return False, f"Query references unknown or disallowed table(s): {', '.join(sorted(unknown_tables))}."
+
+    if not referenced_tables:
+        return False, "Query must read from an allowed application table."
+
+    # ---- 7. No sensitive columns by name -----------------------------------
     sensitive_match = _SENSITIVE_COLUMN_RE.search(cleaned)
     if sensitive_match:
         return False, f"Query references a restricted column: {sensitive_match.group()!r}."
 
-    # ---- 5. No wildcard SELECT against the users table ---------------------
+    # ---- 8. No wildcard SELECT against the users table ---------------------
     if _USERS_TABLE_RE.search(cleaned) and _WILDCARD_RE.search(cleaned):
         return False, (
             "Wildcard SELECT against the users table is not allowed; "
             "select specific non-sensitive columns instead."
         )
 
-    # ---- 6. Strip trailing semicolon for safety ---------------------------
+    # ---- 9. Strip trailing semicolon for safety ---------------------------
     cleaned = cleaned.rstrip(";").strip()
 
     return True, cleaned

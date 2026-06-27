@@ -63,7 +63,7 @@ class Settings(BaseSettings):
 
     # Option B: Ollama (local)
     OLLAMA_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "phi3:mini"
+    OLLAMA_MODEL: str = "qwen3:8b"
 
     # AI Assistant tuning (all optional, safe defaults — only affect the
     # chatbot's RAG answer-synthesis step, see src/ai/service.py)
