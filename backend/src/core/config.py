@@ -85,6 +85,30 @@ class Settings(BaseSettings):
     # the model's real layer count automatically.
     OLLAMA_NUM_GPU: Optional[int] = None
 
+    # httpx timeout (seconds) for calls to Ollama's /api/chat. `read` is the
+    # one that matters most: it bounds how long we wait for the model to
+    # finish generating tokens once the request has been accepted. A large
+    # prompt + an 8B model on a slow GPU/CPU can legitimately take well past
+    # 60s, so this must be generous. `connect`/`write`/`pool` stay tight
+    # since those failures mean Ollama itself isn't reachable at all.
+    OLLAMA_CONNECT_TIMEOUT: float = 30.0
+    OLLAMA_READ_TIMEOUT: float = 300.0
+    OLLAMA_WRITE_TIMEOUT: float = 30.0
+    OLLAMA_POOL_TIMEOUT: float = 30.0
+
+    # SQL-generation call tuning, kept separate from AI_ANSWER_* above.
+    AI_SQL_MAX_TOKENS: int = 300         # a single SELECT rarely needs more; was 450
+    AI_SQL_NUM_CTX: int = 4096
+
+    # qwen3 (and other hybrid "thinking" models) reason internally by default
+    # in Ollama unless `think` is explicitly set to false. For SQL generation
+    # and short grounded answers we want fast, deterministic output, not a
+    # chain-of-thought trace — and Ollama has a known issue where reasoning
+    # tokens can consume the entire num_predict/max_tokens budget, leaving an
+    # empty final answer. Set to true only if you specifically want qwen3 to
+    # show its reasoning (slower, and budgets above must be raised to fit it).
+    OLLAMA_THINK: bool = False
+
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'

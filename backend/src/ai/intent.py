@@ -35,6 +35,15 @@ _GENERAL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# "How do I borrow an item?" / "How to request a laptop?" style questions ask
+# about the *process*, not live data, even though they mention a data noun
+# (item/laptop/borrow) that would otherwise trip _DATA_ACTION_RE. Without this,
+# classify_intent() routes these straight into the SQL pipeline.
+_PROCEDURAL_RE = re.compile(
+    r"\bhow (?:do|can|could|should) (?:i|we|you)\b|\bhow to\b",
+    re.IGNORECASE,
+)
+
 _FOLLOW_UP_RE = re.compile(
     r"\b("
     r"only|those|ones|them|that|these|available|borrowed|dell|hp|apple|"
@@ -57,6 +66,11 @@ def classify_intent(message: str, has_history: bool = False) -> IntentResult:
 
     if is_general and not has_data_action:
         return IntentResult(Intent.GENERAL_CHAT, 0.92, "general assistant question")
+
+    if _PROCEDURAL_RE.search(lowered) and not any(
+        token in lowered for token in ("show", "list", "my", "current", "this month")
+    ):
+        return IntentResult(Intent.GENERAL_CHAT, 0.85, "asks about a process/how-to, not live data")
 
     if is_general and not any(token in lowered for token in ("item", "user", "borrow", "how many", "show", "list", "which")):
         return IntentResult(Intent.GENERAL_CHAT, 0.74, "general inventory concept")

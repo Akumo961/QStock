@@ -3,11 +3,13 @@
 from dataclasses import dataclass
 import logging
 import re
+import time
 from typing import Any
 
 from src.ai.prompts import build_system_prompt, build_user_prompt
 from src.ai.query_templates import maybe_build_template_sql
 from src.ai.sql_guard import validate_sql
+from src.core.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -55,10 +57,18 @@ class SQLGenerator:
         history_messages: list[dict[str, str]],
         history_summary: str,
         last_sql: str,
+        timing: dict[str, float] | None = None,
     ) -> SQLGenerationResult:
+        timing = timing if timing is not None else {}
+        timing.setdefault("prompt_build", 0.0)
+        timing.setdefault("ollama_sql", 0.0)
+        timing.setdefault("validation", 0.0)
+
         template = maybe_build_template_sql(question, history_summary=history_summary, last_sql=last_sql)
         if template:
+            t0 = time.time()
             ok, sql_or_reason = validate_sql(template.sql)
+            timing["validation"] += time.time() - t0
             if ok:
                 return SQLGenerationResult(
                     sql=sql_or_reason,
@@ -72,7 +82,11 @@ class SQLGenerator:
         last_raw_sql: str | None = None
         last_description = ""
 
+        max_tokens = getattr(settings, "AI_SQL_MAX_TOKENS", 300)
+        num_ctx = getattr(settings, "AI_SQL_NUM_CTX", 4096)
+
         for attempt in range(1, self.max_attempts + 1):
+            t0 = time.time()
             messages = (
                 [{"role": "system", "content": build_system_prompt(language, retry_reason=retry_reason)}]
                 + history_messages
@@ -87,13 +101,16 @@ class SQLGenerator:
                     }
                 ]
             )
+            timing["prompt_build"] += time.time() - t0
 
             raw = self.provider.complete(
                 messages,
-                max_tokens=450,
+                max_tokens=max_tokens,
                 temperature=0.0 if attempt == 1 else 0.15,
-                num_ctx=4096,
+                num_ctx=num_ctx,
             )
+            timing["ollama_sql"] += getattr(self.provider, "last_elapsed", 0.0)
+
             raw_sql, description = parse_llm_sql_output(raw)
             last_raw_sql = raw_sql
             last_description = description
@@ -106,7 +123,9 @@ class SQLGenerator:
                 )
                 continue
 
+            t0 = time.time()
             ok, sql_or_reason = validate_sql(raw_sql)
+            timing["validation"] += time.time() - t0
             if ok:
                 return SQLGenerationResult(
                     sql=sql_or_reason,
