@@ -81,7 +81,6 @@ class AIProvider(ABC):
 class OllamaProvider(AIProvider):
     """Local Ollama provider."""
 
-    # ROOT CAUSE of the ReadTimeout: this used to be `httpx.Client(timeout=60)`,
     # a single scalar that applies to connect/read/write/pool *equally*. The
     # failure always happened at "about 60 seconds" because the *read* timeout
     # (waiting for Ollama to finish generating tokens) was being capped at the
@@ -219,6 +218,18 @@ def get_provider(role: str = "sql") -> Optional[AIProvider]:
     model = default_model
     if role == "answer":
         model = getattr(settings, "OLLAMA_ANSWER_MODEL", "") or default_model
+
+    sql_model = default_model
+    sql_num_ctx = getattr(settings, "AI_SQL_NUM_CTX", 4096)
+    answer_num_ctx = getattr(settings, "AI_ANSWER_NUM_CTX", 4096)
+    if sql_model == model and sql_num_ctx != answer_num_ctx:
+        logger.warning(
+            "AI_SQL_NUM_CTX (%d) != AI_ANSWER_NUM_CTX (%d) while both roles use the same "
+            "model (%s). Ollama will reload the model on every alternating call between the "
+            "SQL and answer steps of a single chat turn — set them equal in your .env.",
+            sql_num_ctx, answer_num_ctx, model,
+        )
+
     logger.info("AI provider: Ollama (%s @ %s) [role=%s]", model, ollama_url, role)
     print(
         "=========================\n"
@@ -228,6 +239,8 @@ def get_provider(role: str = "sql") -> Optional[AIProvider]:
         f"Role: {role}\n"
         f"OLLAMA_MODEL setting: {getattr(settings, 'OLLAMA_MODEL', None)!r}\n"
         f"OLLAMA_ANSWER_MODEL setting: {getattr(settings, 'OLLAMA_ANSWER_MODEL', None)!r}\n"
+        f"AI_SQL_NUM_CTX: {sql_num_ctx}  AI_ANSWER_NUM_CTX: {answer_num_ctx}"
+        + ("  <-- MISMATCH, will cause reloads!" if sql_model == model and sql_num_ctx != answer_num_ctx else "") + "\n"
         "========================="
     )
     return OllamaProvider(

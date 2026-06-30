@@ -24,10 +24,13 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
+        "https://localhost:5173",      # Vite dev with basicSsl()
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
         "http://192.168.2.31:5173",
+        "https://192.168.2.31:5173",   # Vite dev with basicSsl() on LAN
         "http://192.168.2.31:3000",
+        "https://192.168.2.31:3000",
     ]
 
     # QR Code Settings
@@ -69,7 +72,17 @@ class Settings(BaseSettings):
     # chatbot's RAG answer-synthesis step, see src/ai/service.py)
     AI_MAX_HISTORY_TURNS: int = 3        # conversation turns remembered per user (kept short for speed)
     AI_ANSWER_MAX_TOKENS: int = 120      # max length of the synthesized answer (kept short for speed)
-    AI_ANSWER_NUM_CTX: int = 2048        # Ollama context window for the answer call
+    AI_ANSWER_NUM_CTX: int = 4096        # Ollama context window for the answer call
+    # NOTE: this MUST match AI_SQL_NUM_CTX whenever OLLAMA_MODEL and
+    # OLLAMA_ANSWER_MODEL point at the same model (your current .env: both
+    # qwen3:8b). Ollama's runner is keyed by (model, num_ctx) — if the same
+    # model is called with two different num_ctx values back-to-back, Ollama
+    # tears down and reloads the whole model to satisfy the new context size.
+    # With a 5.7GB model split 59%/41% CPU/GPU, that reload is NOT cheap —
+    # this was very likely firing on every single chat turn (SQL call at
+    # num_ctx=4096, then immediately the answer call at the old default of
+    # 2048), doubling the cost of every turn. See `ollama ps` CONTEXT column:
+    # if it doesn't match what you expect mid-conversation, this is why.
     AI_CONTEXT_ROW_LIMIT: int = 15       # max retrieved rows fed into the answer prompt (kept short for speed)
 
     # Optional: use a different (e.g. smaller/faster) model just for the

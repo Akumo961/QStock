@@ -90,14 +90,16 @@ class ResponseGenerator:
                 ),
             },
         ]
-        return self.provider.complete(messages, max_tokens=120, temperature=0.25, num_ctx=2048).strip()
+        answer_num_ctx = getattr(settings, "AI_ANSWER_NUM_CTX", 4096)
+        return self.provider.complete(messages, max_tokens=120, temperature=0.25, num_ctx=answer_num_ctx).strip()
 
     def general_answer(self, *, language: str, question: str) -> str:
         messages = [
             {"role": "system", "content": build_general_system_prompt(language)},
             {"role": "user", "content": build_general_user_prompt(question)},
         ]
-        return self.provider.complete(messages, max_tokens=180, temperature=0.35, num_ctx=2048).strip()
+        answer_num_ctx = getattr(settings, "AI_ANSWER_NUM_CTX", 4096)
+        return self.provider.complete(messages, max_tokens=180, temperature=0.35, num_ctx=answer_num_ctx).strip()
 
 
 def fallback_format_rows(rows: list[dict[str, Any]], language: str) -> str:

@@ -45,17 +45,36 @@ export default defineConfig(({ mode }) => {
       https: true,
 
       proxy: {
+        // The AI /api/ai/chat endpoint can take 60-120 s on local CPU/GPU
+        // hardware. Vite's http-proxy inherits Node.js's default socket idle
+        // timeout (~60 s) unless overridden, which silently drops long-running
+        // AI requests and makes the frontend show "something went wrong" even
+        // though the backend completed successfully with HTTP 200.
+        // proxyTimeout = how long to wait for the target to respond (ms)
+        // timeout      = how long the socket can be idle (ms)
+        '/api/ai': {
+          target: env.VITE_API_URL || 'http://192.168.2.31:8000',
+          changeOrigin: true,
+          secure: false,
+          proxyTimeout: 300000,   // 5 minutes — covers worst-case CPU inference
+          timeout: 300000,
+        },
         '/api': {
           target: env.VITE_API_URL || 'http://192.168.2.31:8000',
           changeOrigin: true,
           secure: false,
+          proxyTimeout: 30000,
+          timeout: 30000,
         },
       },
 
       hmr: {
         host: '192.168.2.31',
         port: 5173,
-        protocol: 'ws',
+        // When Vite runs with https:true it serves over HTTPS, so HMR
+        // WebSockets must use wss:// not ws:// — the mismatch was causing the
+        // flood of ERR_EMPTY_RESPONSE errors in the browser console.
+        protocol: 'wss',
         overlay: true,
       },
     },

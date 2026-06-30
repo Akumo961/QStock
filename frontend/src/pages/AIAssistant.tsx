@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
@@ -269,7 +268,17 @@ const AIAssistant: React.FC = () => {
     setLoading(true);
 
     try {
-      const data = await api.post<ChatResponse>('/ai/chat', { message: trimmed, language });
+      // AI chat can take 60–120 s on local hardware (CPU/GPU-split inference).
+      // The global axios instance has a 60 s timeout — override it here for
+      // just this call. The Vite proxy also has a 300 s proxyTimeout set in
+      // vite.config.ts, which is what actually keeps the tunnel open long
+      // enough for the model to respond. Both must be generous.
+      const data = await api.post<ChatResponse>(
+        '/ai/chat',
+        { message: trimmed, language },
+        undefined,
+        { timeout: 300000 },   // 5 minutes — matches the vite proxy timeout
+      );
 
       const assistantMsg: Message = {
         id: nextId.current++,
@@ -282,12 +291,19 @@ const AIAssistant: React.FC = () => {
       };
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err: unknown) {
+      const isTimeout =
+        (err as any)?.message?.includes('timeout') ||
+        (err as any)?.code === 'ECONNABORTED';
       const errorMsg: Message = {
         id: nextId.current++,
         role: 'assistant',
-        text: fr
-          ? "Une erreur s'est produite lors du traitement de votre demande. Veuillez réessayer."
-          : 'Something went wrong while processing your request. Please try again.',
+        text: isTimeout
+          ? (fr
+              ? "La requête a pris trop de temps. Le modèle est peut-être en cours de chargement — réessayez dans quelques secondes."
+              : 'The request timed out. The model may still be loading — please try again.')
+          : (fr
+              ? `Une erreur s'est produite : ${(err as any)?.message ?? 'inconnue'}. Veuillez réessayer.`
+              : `Something went wrong: ${(err as any)?.message ?? 'unknown error'}. Please try again.`),
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorMsg]);
