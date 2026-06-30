@@ -122,6 +122,14 @@ class Settings(BaseSettings):
     # show its reasoning (slower, and budgets above must be raised to fit it).
     OLLAMA_THINK: bool = False
 
+    # On CPU/GPU-split hardware, even a short LLM "phrase these rows nicely"
+    # call can take 20-30+ seconds — far more than the SQL generation step
+    # for templated queries, which can be skipped entirely. When True, any
+    # plain item/user list result is formatted directly in Python instead of
+    # being sent to the LLM for phrasing. Set to False if you'd rather always
+    # get the LLM's more natural prose and are willing to pay the latency.
+    AI_DETERMINISTIC_LIST_ANSWERS: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'

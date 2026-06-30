@@ -63,8 +63,11 @@ class SQLGenerator:
         timing.setdefault("prompt_build", 0.0)
         timing.setdefault("ollama_sql", 0.0)
         timing.setdefault("validation", 0.0)
+        timing.setdefault("template_match", 0.0)
 
+        t0 = time.time()
         template = maybe_build_template_sql(question, history_summary=history_summary, last_sql=last_sql)
+        timing["template_match"] += time.time() - t0
         if template:
             t0 = time.time()
             ok, sql_or_reason = validate_sql(template.sql)

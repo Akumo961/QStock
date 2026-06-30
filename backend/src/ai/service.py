@@ -27,7 +27,9 @@ from src.ai.prompts import build_clarification_answer
 from src.ai.response_generator import (
     ResponseGenerator,
     can_answer_general_deterministically,
+    deterministic_data_answer,
     deterministic_general_answer,
+    deterministic_list_answer,
     fallback_format_rows,
 )
 from src.ai.schemas import ChatResponse
@@ -81,6 +83,7 @@ class AIProvider(ABC):
 class OllamaProvider(AIProvider):
     """Local Ollama provider."""
 
+    # ROOT CAUSE of the ReadTimeout: this used to be `httpx.Client(timeout=60)`,
     # a single scalar that applies to connect/read/write/pool *equally*. The
     # failure always happened at "about 60 seconds" because the *read* timeout
     # (waiting for Ollama to finish generating tokens) was being capped at the
@@ -261,14 +264,19 @@ def handle_chat(
     language = language if language in ("en", "fr") else "en"
     display_question = (display_question or user_message).strip()
     started_at = time.time()
+    stage_timing: dict[str, float] = {}
 
+    t0 = time.time()
     max_turns = getattr(settings, "AI_MAX_HISTORY_TURNS", conversation_memory.DEFAULT_MAX_TURNS)
     history = conversation_memory.get_history(requesting_user_id, max_turns=max_turns)
     history_messages = _history_to_messages(history)
     history_summary = conversation_memory.get_context_summary(requesting_user_id, max_turns=max_turns)
     last_sql = conversation_memory.get_last_sql(requesting_user_id)
+    stage_timing["memory"] = time.time() - t0
 
+    t0 = time.time()
     intent_result = classify_intent(display_question, has_history=bool(history))
+    stage_timing["intent"] = time.time() - t0
     logger.info(
         "AI intent | user_id=%d | intent=%s | confidence=%.2f | reason=%s",
         requesting_user_id,
@@ -291,21 +299,24 @@ def handle_chat(
         answer = deterministic_general_answer(display_question, language)
         _remember_turn(requesting_user_id, display_question, answer, intent=Intent.GENERAL_CHAT.value)
         _log(requesting_user_id, display_question, None, started_at, intent=Intent.GENERAL_CHAT.value)
+        _print_stage_timing(stage_timing, started_at)
         return ChatResponse(answer=answer, sql=None, rows=None)
 
     if provider is None:
         return ChatResponse(answer=_msg("no_provider", language), sql=None, rows=None, error="no_provider")
 
     if intent_result.intent == Intent.GENERAL_CHAT:
-        return _handle_general_chat(
+        response = _handle_general_chat(
             provider=provider,
             requesting_user_id=requesting_user_id,
             question=display_question,
             language=language,
             started_at=started_at,
         )
+        _print_stage_timing(stage_timing, started_at)
+        return response
 
-    return _handle_sql_chat(
+    response = _handle_sql_chat(
         db=db,
         provider=provider,
         requesting_user_id=requesting_user_id,
@@ -316,7 +327,31 @@ def handle_chat(
         history_messages=history_messages,
         history_summary=history_summary,
         last_sql=last_sql,
+        stage_timing=stage_timing,
     )
+    return response
+
+
+def _print_stage_timing(stage_timing: dict[str, float], started_at: float) -> None:
+    """Print the per-stage breakdown in the exact format requested for
+    performance profiling. Called once per request, at the very end, so it
+    always reflects every stage that actually ran (some are skipped for
+    general-chat / clarification / error-path requests).
+    """
+    total = time.time() - started_at
+    rows = [
+        ("Intent Detection", stage_timing.get("intent", 0.0) * 1000),
+        ("Template Match", stage_timing.get("template_match", 0.0) * 1000),
+        ("Memory", stage_timing.get("memory", 0.0) * 1000),
+        ("SQL Generation", stage_timing.get("ollama_sql", 0.0) * 1000),
+        ("SQL Guard", stage_timing.get("validation", 0.0) * 1000),
+        ("SQL Execution", stage_timing.get("execution", 0.0) * 1000),
+        ("Answer Generation", stage_timing.get("answer", 0.0) * 1000),
+    ]
+    width = max(len(label) for label, _ in rows)
+    lines = [f"{label:<{width}} {value:>8.1f} ms" for label, value in rows]
+    lines.append(f"{'TOTAL':<{width}} {total * 1000:>8.1f} ms")
+    print("\n".join(lines))
 
 
 def _handle_general_chat(
@@ -357,8 +392,9 @@ def _handle_sql_chat(
     history_messages: list[dict[str, str]],
     history_summary: str,
     last_sql: str,
+    stage_timing: dict[str, float] | None = None,
 ) -> ChatResponse:
-    timing: dict[str, float] = {}
+    timing: dict[str, float] = stage_timing if stage_timing is not None else {}
     try:
         generation = SQLGenerator(provider).generate(
             question=user_message,
@@ -371,6 +407,7 @@ def _handle_sql_chat(
     except Exception as exc:
         logger.exception("LLM SQL generation failed")
         _print_timing(timing, started_at, execution=0.0, answer=0.0)
+        _print_stage_timing(timing, started_at)
         return ChatResponse(answer=_msg("llm_unreachable", language), sql=None, rows=None, error=str(exc))
 
     if generation.sql is None:
@@ -378,6 +415,7 @@ def _handle_sql_chat(
         _remember_turn(requesting_user_id, display_question, answer, intent=Intent.INVENTORY_SQL.value)
         _log(requesting_user_id, user_message, generation.raw_sql, started_at, intent=Intent.INVENTORY_SQL.value)
         _print_timing(timing, started_at, execution=0.0, answer=0.0)
+        _print_stage_timing(timing, started_at)
         return ChatResponse(answer=answer, sql=None, rows=None, error=generation.error)
 
     clean_sql = _normalize_enum_ilike(generation.sql)
@@ -389,11 +427,64 @@ def _handle_sql_chat(
     except Exception as exc:
         db.rollback()
         execution_time = time.time() - exec_started
+        timing["execution"] = execution_time
         logger.exception("SQL execution error for user %d | SQL: %s", requesting_user_id, clean_sql)
         _log(requesting_user_id, user_message, clean_sql, started_at, intent=Intent.INVENTORY_SQL.value)
         _print_timing(timing, started_at, execution=execution_time, answer=0.0)
+        _print_stage_timing(timing, started_at)
         return ChatResponse(answer=_msg("execution_failed", language), sql=clean_sql, rows=None, error=str(exc))
     execution_time = time.time() - exec_started
+    timing["execution"] = execution_time
+
+    # Fast path: if the result is a known aggregate/statistics shape, format
+    # the answer directly in Python instead of calling the LLM at all. This
+    # is both faster (zero model latency) and immune to numeric hallucination
+    # — the numbers come straight from the SQL result, not from a model that
+    # has to "read" them back correctly. Falls through to the LLM for any
+    # row shape this doesn't recognize, so no functionality is lost — only
+    # the already-fixed-shape statistics templates get the speedup.
+    answer_started = time.time()
+    deterministic_answer = deterministic_data_answer(display_question, rows, language) if rows else None
+    if deterministic_answer is not None and _is_known_aggregate_shape(rows):
+        answer = deterministic_answer
+        answer_time = time.time() - answer_started
+        timing["answer"] = answer_time
+        _remember_turn(
+            requesting_user_id,
+            display_question,
+            answer,
+            sql=clean_sql,
+            row_preview=preview_rows(rows),
+            intent=Intent.INVENTORY_SQL.value,
+        )
+        _log(requesting_user_id, user_message, clean_sql, started_at, intent=Intent.INVENTORY_SQL.value)
+        _print_timing(timing, started_at, execution=execution_time, answer=answer_time)
+        _print_stage_timing(timing, started_at)
+        return ChatResponse(answer=answer.strip(), sql=clean_sql, rows=rows)
+
+    # Second fast path: a plain list of items/users. This is the single
+    # biggest latency win on CPU/GPU-split hardware, because it covers the
+    # overwhelming majority of real queries (the previous fast path above
+    # only covers narrow aggregate/statistics shapes). Gated behind a
+    # feature flag so it can be disabled if you specifically want the LLM's
+    # more natural phrasing and are willing to pay the latency cost for it.
+    if rows and getattr(settings, "AI_DETERMINISTIC_LIST_ANSWERS", True):
+        list_answer = deterministic_list_answer(rows, language)
+        if list_answer is not None:
+            answer_time = time.time() - answer_started
+            timing["answer"] = answer_time
+            _remember_turn(
+                requesting_user_id,
+                display_question,
+                list_answer,
+                sql=clean_sql,
+                row_preview=preview_rows(rows),
+                intent=Intent.INVENTORY_SQL.value,
+            )
+            _log(requesting_user_id, user_message, clean_sql, started_at, intent=Intent.INVENTORY_SQL.value)
+            _print_timing(timing, started_at, execution=execution_time, answer=answer_time)
+            _print_stage_timing(timing, started_at)
+            return ChatResponse(answer=list_answer.strip(), sql=clean_sql, rows=rows)
 
     answer_provider = get_provider(role="answer") or provider
     response_generator = ResponseGenerator(answer_provider)
@@ -418,6 +509,7 @@ def _handle_sql_chat(
         logger.exception("Answer synthesis failed; using deterministic fallback")
         answer = fallback_format_rows(rows, language)
     answer_time = time.time() - answer_started
+    timing["answer"] = answer_time
 
     _remember_turn(
         requesting_user_id,
@@ -429,7 +521,26 @@ def _handle_sql_chat(
     )
     _log(requesting_user_id, user_message, clean_sql, started_at, intent=Intent.INVENTORY_SQL.value)
     _print_timing(timing, started_at, execution=execution_time, answer=answer_time)
+    _print_stage_timing(timing, started_at)
     return ChatResponse(answer=answer.strip(), sql=clean_sql, rows=rows)
+
+
+def _is_known_aggregate_shape(rows: list[dict]) -> bool:
+    """True only for the exact statistics/aggregate row shapes that
+    `deterministic_data_answer()` knows how to phrase. Deliberately strict —
+    a single unrecognized extra column means we fall through to the LLM
+    rather than risk a generic/incomplete deterministic phrasing.
+    """
+    if len(rows) != 1:
+        return False
+    keys = set(rows[0].keys())
+    known_shapes = (
+        {"item_records", "total_quantity", "available_quantity", "unavailable_quantity",
+         "available_records", "borrowed_records", "maintenance_records", "retired_records"},
+        {"current_available_inventory", "total_inventory", "unavailable_inventory"},
+        {"maintenance_item_records", "maintenance_total_quantity"},
+    )
+    return any(shape.issubset(keys) for shape in known_shapes)
 
 
 def _print_timing(timing: dict[str, float], started_at: float, execution: float, answer: float) -> None:

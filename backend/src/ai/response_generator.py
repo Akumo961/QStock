@@ -11,6 +11,30 @@ from src.ai.prompts import (
 )
 from src.core.config import settings
 
+# Columns that are verbose and rarely needed in a user-facing answer. Strip
+# them from rows before serializing into the answer prompt so the context
+# stays small and inference stays fast. The values are still returned in
+# ChatResponse.rows for the frontend to display if it wants them.
+_VERBOSE_COLUMNS = frozenset({
+    "description", "notes", "image_url", "qr_code_data", "qr_code_image",
+    "hashed_password", "purchase_date", "created_at", "updated_at",
+    "is_borrowable", "requires_approval", "max_borrow_days",
+})
+
+
+def slim_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return rows with verbose columns stripped for prompt serialization."""
+    if not rows:
+        return rows
+    # Only strip if the row has more than 6 columns — for narrow aggregate
+    # results (stats, counts) we keep everything since they're already compact.
+    if len(rows[0]) <= 6:
+        return rows
+    return [
+        {k: v for k, v in row.items() if k not in _VERBOSE_COLUMNS}
+        for row in rows
+    ]
+
 
 def serialize_rows_for_prompt(rows: list[dict[str, Any]], limit: int) -> str:
     """Compact, token-efficient serialization of retrieved rows."""
@@ -115,6 +139,76 @@ def fallback_format_rows(rows: list[dict[str, Any]], language: str) -> str:
 
     prefix = f"Found {len(rows)} result(s)." if language != "fr" else f"{len(rows)} resultat(s) trouve(s)."
     return prefix + "\n\n" + "\n".join(lines)
+
+
+def deterministic_list_answer(rows: list[dict[str, Any]], language: str, max_items: int = 20) -> str | None:
+    """Format a list-of-rows result directly in Python, with no LLM call.
+
+    This is deliberately conservative: it only fires when every row has a
+    recognizable "label" field (name or full_name) — the shape produced by
+    essentially every item/user listing template in query_templates.py. Any
+    row shape it doesn't recognize returns None, so the caller falls through
+    to the LLM exactly as before. No functionality is lost; only the
+    overwhelmingly common case (a simple list of items or people) gets the
+    speedup, since on CPU/GPU-split hardware even a short LLM phrasing call
+    can take 20-30+ seconds — far more than formatting ever costs.
+    """
+    if not rows:
+        return None
+
+    first = rows[0]
+    if "name" in first:
+        label_key = "name"
+    elif "full_name" in first:
+        label_key = "full_name"
+    else:
+        return None
+
+    # Fields worth showing inline, in a sensible reading order. Anything not
+    # in this list (ids, timestamps, internal flags) is simply omitted —
+    # matches what the LLM was already choosing to surface in practice.
+    _DISPLAY_FIELDS = [
+        ("item_code", "Item Code" if language != "fr" else "Code"),
+        ("email", "Email"),
+        ("department", "Department" if language != "fr" else "Departement"),
+        ("brand", "Brand" if language != "fr" else "Marque"),
+        ("model", "Model" if language != "fr" else "Modele"),
+        ("category", "Category" if language != "fr" else "Categorie"),
+        ("status", "Status" if language != "fr" else "Statut"),
+        ("quantity", "Quantity" if language != "fr" else "Quantite"),
+        ("available_quantity", "Available" if language != "fr" else "Disponible"),
+        ("location", "Location" if language != "fr" else "Emplacement"),
+        ("overdue_transaction_count", "Overdue Count" if language != "fr" else "Retards"),
+        ("oldest_due_date", "Oldest Due" if language != "fr" else "Echeance"),
+        ("times_borrowed", "Times Borrowed" if language != "fr" else "Fois Empruntee"),
+        ("borrowed_at", "Borrowed At" if language != "fr" else "Emprunte le"),
+        ("due_date", "Due" if language != "fr" else "Echeance"),
+    ]
+
+    shown = rows[:max_items]
+    lines = []
+    for index, row in enumerate(shown, start=1):
+        label = row.get(label_key) or "(unnamed)"
+        details = [
+            f"{display_name}: {row[key]}"
+            for key, display_name in _DISPLAY_FIELDS
+            if key in row and row[key] is not None
+        ]
+        suffix = f" - {', '.join(details)}" if details else ""
+        lines.append(f"{index}. **{label}**{suffix}")
+
+    header = ""
+    if len(rows) > max_items:
+        if language == "fr":
+            header = f"Voici les {max_items} premiers sur {len(rows)} resultat(s) :\n\n"
+        else:
+            header = f"Here are the first {max_items} of {len(rows)} result(s):\n\n"
+    elif language == "fr":
+        header = f"Voici les {len(rows)} resultat(s) trouve(s) :\n\n"
+    else:
+        header = f"Here are the {len(rows)} result(s) found:\n\n"
+
+    return header + "\n".join(lines)
 
 
 def deterministic_data_answer(question: str, rows: list[dict[str, Any]], language: str) -> str | None:
