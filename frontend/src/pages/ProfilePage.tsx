@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Grid, Card, CardContent, Typography, Tabs, Tab,
@@ -68,7 +67,7 @@ const EnhancedProfile: React.FC = () => {
   });
 
   const [passwordData, setPasswordData] = useState({
-    current_password: '', new_password: '', confirm_password: '',
+    new_password: '', confirm_password: '',
   });
 
   const [notifications, setNotifications] = useState({
@@ -164,12 +163,11 @@ const EnhancedProfile: React.FC = () => {
     try {
       // BUG 12 FIX: use centralized api service
       await userAPI.changePassword({
-        current_password: passwordData.current_password,
         new_password: passwordData.new_password,
       });
       setSuccess('Password changed successfully!');
       setShowPasswordDialog(false);
-      setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
+      setPasswordData({ new_password: '', confirm_password: '' });
     } catch (err: any) {
       setError(err.message || 'Failed to change password');
     } finally {
@@ -556,10 +554,6 @@ const EnhancedProfile: React.FC = () => {
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12}>
-              <TextField fullWidth type="password" label="Current Password" value={passwordData.current_password}
-                onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })} disabled={saving} />
-            </Grid>
-            <Grid item xs={12}>
               <TextField fullWidth type="password" label="New Password" value={passwordData.new_password}
                 onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
                 disabled={saving} helperText="Minimum 8 characters" />
@@ -576,7 +570,7 @@ const EnhancedProfile: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setShowPasswordDialog(false)} disabled={saving}>Cancel</Button>
           <Button onClick={handleChangePassword} variant="contained"
-            disabled={saving || !passwordData.current_password || !passwordData.new_password || passwordData.new_password !== passwordData.confirm_password}>
+            disabled={saving || !passwordData.new_password || passwordData.new_password !== passwordData.confirm_password}>
             {saving ? 'Changing...' : 'Change Password'}
           </Button>
         </DialogActions>
@@ -612,7 +606,4 @@ const EnhancedProfile: React.FC = () => {
   );
 };
 
-// BUG 5 FIX: export the component that is actually defined in this file.
-// Was: export default Profile;  ← ReferenceError, Profile does not exist
-// Now: export default EnhancedProfile;  ← matches the const above
 export default EnhancedProfile;

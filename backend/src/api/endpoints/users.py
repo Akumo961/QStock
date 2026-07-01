@@ -268,14 +268,6 @@ async def change_my_password(
         current_user: User = Depends(get_current_user)
 ):
     """Change current user's password."""
-    from src.core.security import verify_password
-
-    if not verify_password(password_data.old_password, current_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect password"
-        )
-
     current_user.hashed_password = get_password_hash(password_data.new_password)
     db.commit()
 

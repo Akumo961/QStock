@@ -78,7 +78,6 @@ export interface UserProfileUpdate {
  * Password change
  */
 export interface PasswordChange {
-  current_password: string;
   new_password: string;
   confirm_password?: string;
 }

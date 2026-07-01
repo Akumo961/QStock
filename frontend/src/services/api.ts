@@ -92,8 +92,8 @@ class ApiService {
     return this.request<T>({ url: endpoint, method: 'GET', params });
   }
 
-  async post<T>(endpoint: string, data?: any, params?: QueryParams): Promise<T> {
-    return this.request<T>({ url: endpoint, method: 'POST', data, params });
+  async post<T>(endpoint: string, data?: any, params?: QueryParams, config?: AxiosRequestConfig): Promise<T> {
+    return this.request<T>({ url: endpoint, method: 'POST', data, params, ...config });
   }
 
   async put<T>(endpoint: string, data?: any, params?: QueryParams): Promise<T> {
@@ -188,7 +188,7 @@ export const userAPI = {
   delete: (id: number) =>
     api.delete(`/users/${id}`),
 
-  changePassword: (data: { current_password: string; new_password: string }) =>
+  changePassword: (data: { new_password: string }) =>
     api.post('/users/me/change-password', data),
 
   getStats: () =>

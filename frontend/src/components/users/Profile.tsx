@@ -102,7 +102,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onUpdate }) => {
 
   // Password change data
   const [passwordData, setPasswordData] = useState({
-    current_password: '',
     new_password: '',
     confirm_password: '',
   });
@@ -258,7 +257,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onUpdate }) => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            current_password: passwordData.current_password,
             new_password: passwordData.new_password,
           }),
         }
@@ -272,7 +270,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onUpdate }) => {
       setSuccess('Password changed successfully!');
       setShowPasswordDialog(false);
       setPasswordData({
-        current_password: '',
         new_password: '',
         confirm_password: '',
       });
@@ -716,17 +713,6 @@ const Profile: React.FC<ProfileProps> = ({ userId, onUpdate }) => {
         <DialogTitle>Change Password</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                type="password"
-                label="Current Password"
-                value={passwordData.current_password}
-                onChange={(e) =>
-                  setPasswordData({ ...passwordData, current_password: e.target.value })
-                }
-              />
-            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
